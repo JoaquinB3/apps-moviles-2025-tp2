@@ -213,6 +213,9 @@ fun GameModule(
     highestScore: MutableState<Int>,
     saveHighestScore: (Int) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -238,39 +241,54 @@ fun GameModule(
             value = userGuess.value,
             onValueChange = { userGuess.value = it },
             label = { Text("Ingrese un número:") },
-            modifier = Modifier
-                .width(200.dp)
+            modifier = Modifier.width(200.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         ModuleButton("Adivinar", onClick = {
-            val guess = userGuess.value.text.toIntOrNull()
-            if (guess != null && guess in 1..5) {
-                if (guess == randomNumber.value) {
-                    score.value += 10
+            val guessText = userGuess.value.text.trim()
+            val guess = guessText.toIntOrNull()
+
+            if (guess == null || guess !in 1..5) {
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Ingrese un número válido del 1 al 5",
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                return@ModuleButton
+            }
+
+            if (guess == randomNumber.value) {
+                score.value += 10
+                attempts.value = 0
+                randomNumber.value = Random.nextInt(1, 6)
+                onCorrectGuess()
+
+                if (score.value > highestScore.value) {
+                    highestScore.value = score.value
+                    saveHighestScore(score.value)
+                }
+            } else {
+                attempts.value += 1
+                onWrongGuess()
+                if (attempts.value == 5) {
+                    score.value = 0
                     attempts.value = 0
                     randomNumber.value = Random.nextInt(1, 6)
-                    onCorrectGuess()
-
-                    if (score.value > highestScore.value) {
-                        highestScore.value = score.value
-                        saveHighestScore(score.value)
-                    }
-                } else {
-                    attempts.value += 1
-                    onWrongGuess()
-                    if (attempts.value == 5) {
-                        score.value = 0
-                        attempts.value = 0
-                        randomNumber.value = Random.nextInt(1, 6)
-                        onGameOver()
-                    }
+                    onGameOver()
                 }
             }
         })
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Mostrar el SnackbarHost necesario para este módulo
+        SnackbarHost(hostState = snackbarHostState)
     }
 }
+
 
 fun resetGame(
     score: MutableState<Int>,
